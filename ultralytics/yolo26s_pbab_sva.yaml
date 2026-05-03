@@ -1,0 +1,96 @@
+
+# yolo26s_bima_nssa.yaml
+
+nc: 10
+end2end: True
+reg_max: 1
+
+
+scales: 
+  # [depth, width, max_channels]
+  n: [0.50, 0.25, 1024] # summary: 260 layers, 2,572,280 parameters, 2,572,280 gradients, 6.1 GFLOPs
+  s: [0.50, 0.50, 1024] # summary: 260 layers, 10,009,784 parameters, 10,009,784 gradients, 22.8 GFLOPs
+  m: [0.50, 1.00, 512] # summary: 280 layers, 21,896,248 parameters, 21,896,248 gradients, 75.4 GFLOPs
+  l: [1.00, 1.00, 512] # summary: 392 layers, 26,299,704 parameters, 26,299,704 gradients, 93.8 GFLOPs
+  x: [1.00, 1.50, 512] # summary: 392 layers, 58,993,368 parameters, 58,993,368 gradients, 209.5 GFLOPs
+
+
+# ---------------- BACKBONE (NSSA) ----------------
+backbone:
+  - [-1, 1, Conv, [64, 3, 2]]         # 0
+  - [-1, 1, Conv, [128, 3, 2]]        # 1
+  - [-1, 2, C3k2, [256, False, 0.25]] # 2  P2
+  - [-1, 1, Conv, [256, 3, 2]]        # 3
+  - [-1, 2, C3k2, [512, False, 0.25]] # 4  P3
+  - [-1, 1, Conv, [512, 3, 2]]        # 5
+  - [-1, 2, C3k2, [512, True]]        # 6  P4
+  - [-1, 1, Conv, [1024, 3, 2]]       # 7
+  - [-1, 2, C3k2, [1024, True]]       # 8  P5
+
+  - [-1, 1, NSSA, [2, 8]]             # 9  NSSA
+  - [-1, 1, SPPF, [1024, 5, 3, True]] # 10
+  - [-1, 2, C2PSA, [1024]]            # 11
+
+# ---------------- BIMA NECK ----------------
+head:
+  # ── Six CBS containers (kernel=1, stride=1) ──────────────────────────────
+  # Tap backbone C3k2/C2PSA outputs directly — NOT other CBS outputs.
+  # This gives each SDF node a clean, unmodified backbone signal.
+  - [2,  1, Conv, [128, 1, 1]]              # 12  CBS-P2  160x160
+  - [4,  1, Conv, [128, 1, 1]]              # 13  CBS-P3   80x80
+  - [6,  1, Conv, [128, 1, 1]]              # 14  CBS-P4   40x40
+  - [11, 1, Conv, [128, 1, 1]]              # 15  CBS-P5   20x20  (deep semantic anchor)
+  - [4,  1, Conv, [128, 1, 1]]              # 16  CBS-P3 second tap (80x80)
+  - [6,  1, Conv, [128, 1, 1]]              # 17  CBS-P4 second tap (40x40)
+
+  # ── Top-down path ────────────────────────────────────────────────────────
+  # SDF @ P4 (40x40): upsample C2PSA -> fuse with P4 backbone -> C3k2 -> CBS -> SDF
+  - [11, 1, nn.Upsample, [None, 2, 'nearest']]  # 18  upsample C2PSA: 20->40
+  - [[18, 6], 1, Concat, [1]]                   # 19  concat with P4 backbone (both 40x40)
+  - [-1, 2, C3k2, [512, True]]                  # 20  C3k2
+  - [-1, 1, Conv, [128, 1, 1]]                  # 21  CBS
+  # inputs: [CBS-P4(14), CBS-P4-2nd(17), L21(CBS), CBS-P5(15)]
+  # spatial: [40, 40, 40, 20] -> target_idx=2 -> output @ 40x40
+  - [[14, 17, 21, 15], 1, BIMA_TD_P4, [128]]    # 22  SDF_TD @ P4 (40x40)
+
+  # SDF @ P3 (80x80): upsample SDF_P4 -> fuse with P3 backbone -> C3k2 -> CBS -> SDF
+  - [22, 1, nn.Upsample, [None, 2, 'nearest']]  # 23  upsample SDF_P4: 40->80
+  - [[23, 4], 1, Concat, [1]]                   # 24  concat with P3 backbone (both 80x80)
+  - [-1, 2, C3k2, [256, True]]                  # 25  C3k2
+  - [-1, 1, Conv, [128, 1, 1]]                  # 26  CBS
+  # inputs: [CBS-P3(13), CBS-P3-2nd(16), L26(CBS), CBS-P5(15)]
+  # spatial: [80, 80, 80, 20] -> target_idx=1 -> output @ 80x80
+  - [[13, 16, 26, 15], 1, BIMA_TD_P3, [128]]    # 27  SDF_TD @ P3 (80x80)
+
+  # SDF @ P2 (160x160): upsample SDF_P3 -> fuse with P2 backbone -> C3k2 -> SDF
+  - [27, 1, nn.Upsample, [None, 2, 'nearest']]  # 28  upsample SDF_P3: 80->160
+  - [[28, 2], 1, Concat, [1]]                   # 29  concat with P2 backbone (both 160x160)
+  - [-1, 2, C3k2, [256, False, 0.25]]            # 30  C3k2
+  # inputs: [CBS-P2(12), L30(C3k2), L27(SDF_P3), CBS-P5(15)]
+  # spatial: [160, 160, 80, 20] -> target_idx=0 -> output @ 160x160
+  - [[12, 30, 27, 15], 1, BIMA_TD_P2, [128]]    # 31  SDF_TD @ P2 (160x160) -> CSFA-Head4
+
+  # ── Bottom-up path ───────────────────────────────────────────────────────
+  # SDF BU @ P3 (80x80): downsample SDF_P2 -> fuse SDF_TD_P3 -> C3k2 -> CBS -> SDF
+  - [31, 1, Conv, [128, 3, 2]]                  # 32  CBS stride=2: 160->80
+  - [[32, 27], 1, Concat, [1]]                  # 33  concat with SDF_TD_P3 (both 80x80)
+  - [-1, 2, C3k2, [256, True]]                  # 34  C3k2
+  - [-1, 1, Conv, [128, 1, 1]]                  # 35  CBS
+  # inputs: [L31(SDF_P2@160), L35(CBS@80), L22(SDF_P4@40), CBS-P5(15@20)]
+  # spatial: [160, 80, 40, 20] -> target_idx=1 -> output @ 80x80
+  - [[31, 35, 22, 15], 1, BIMA_BU_P3, [128]]    # 36  SDF_BU @ P3 (80x80)  -> CSFA-Head3
+
+  # SDF BU @ P4 (40x40): downsample SDF_BU_P3 -> fuse SDF_TD_P4 -> C3k2 -> CBS -> SDF
+  - [36, 1, Conv, [128, 3, 2]]                  # 37  CBS stride=2: 80->40
+  - [[37, 22], 1, Concat, [1]]                  # 38  concat with SDF_TD_P4 (both 40x40)
+  - [-1, 2, C3k2, [512, True]]                  # 39  C3k2
+  - [-1, 1, Conv, [128, 1, 1]]                  # 40  CBS
+  # inputs: [L31(SDF_P2@160), L36(SDF_BU_P3@80), L40(CBS@40), CBS-P5(15@20)]
+  # spatial: [160, 80, 40, 20] -> target_idx=2 -> output @ 40x40
+  - [[31, 36, 40, 15], 1, BIMA_BU_P4, [128]]    # 41  SDF_BU @ P4 (40x40)  -> CSFA-Head2
+
+  # ── Detection: P2(160x160), P3(80x80), P4(40x40) ────────────────────────
+  - [[31, 36, 41], 1, Detect, [nc]]
+
+
+scale: s
