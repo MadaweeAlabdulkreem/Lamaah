@@ -39,8 +39,8 @@ In this study, we use the **VisDrone2019 dataset**, a widely used benchmark for 
 
  * It includes 10 object classes: pedestrian, people, bicycle, car, van, truck, tricycle, awning-tricycle, bus, and motor. Object sizes follow COCO-based categories (small, medium, and large). The dataset presents several challenges such as small objects, scale variation, occlusion, and dense scenes. All experiments are conducted using the official dataset split to ensure fair comparison.
 
-Dataset link: [VisDrone2019 Dataset](https://github.com/VisDrone/VisDrone-Dataset), 
-## Results.
+Dataset link: [VisDrone2019 Dataset](https://github.com/VisDrone/VisDrone-Dataset) 
+## Results
 <img width="1305" height="1404" alt="Black and White Square Design Business Minimalist Logo (1)" src="https://github.com/user-attachments/assets/7aa944ef-06ac-4f6e-be15-44ac10c01fd4" />
 
 ## Evaluation 
