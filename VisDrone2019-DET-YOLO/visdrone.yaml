@@ -1,0 +1,5 @@
+path: D:\F9_WM\VisDrone2019-DET-YOLO
+train: images/train
+val: images/val
+nc: 10
+names: ['pedestrian', 'people', 'bicycle', 'car', 'van', 'truck', 'tricycle', 'awning-tricycle', 'bus', 'motor']
