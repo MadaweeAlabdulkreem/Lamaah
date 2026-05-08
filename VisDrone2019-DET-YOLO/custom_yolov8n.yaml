@@ -1,0 +1,29 @@
+# YOLOv8 Custom Model with NSSA, BIMA-FPN, CSFA-Head
+
+# Parameters
+nc: 10
+depth_multiple: 0.33
+width_multiple: 0.25
+
+# Backbone
+backbone:
+  - [-1, 1, nn.Conv2d, [3, 16, 3, 2]]    # 0
+  - [-1, 1, nn.Conv2d, [16, 32, 3, 2]]   # 1
+  - [-1, 1, C2f, [32, 32, 1, True]]      # 2
+  - [-1, 1, nn.Conv2d, [32, 64, 3, 2]]   # 3
+  - [-1, 2, C2f, [64, 64, 2, True]]      # 4
+  - [-1, 1, nn.Conv2d, [64, 128, 3, 2]]  # 5
+  - [-1, 2, C2f, [128, 128, 2, True]]    # 6
+  - [-1, 1, nn.Conv2d, [128, 256, 3, 2]] # 7
+  - [-1, 1, C2f, [256, 256, 1, True]]    # 8
+  - [-1, 1, NonSemanticSparseAttention, [256, 2, 8, 0.1]]  # 9 - NSSA
+  - [-1, 1, SPPF, [256, 256, 5]]         # 10
+
+# Neck - BIMA-FPN
+neck:
+  - [-1, 1, BIMA_FPN, [[256, 512, 1024]]]  # 11 - BIMA-FPN
+
+# Head - with CSFA-Head
+head:
+  - [-1, 1, CSFAHead, [256, 3]]           # 12 - CSFA-Head
+  - [[12], 1, Detect, [10, [64, 128, 256]]]  # 13 - Detection
