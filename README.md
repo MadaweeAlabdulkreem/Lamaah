@@ -8,6 +8,7 @@
 - [Dataset](#dataset)
 - [Results](#results)
 - [Evaluation](#evaluation)
+- [Interactive Demo](#interactive-demo)
 - [Resources](#resources)
 
 ---
@@ -45,6 +46,16 @@ Dataset link: [VisDrone2019 Dataset](https://github.com/VisDrone/VisDrone-Datase
 
 ## Evaluation 
 In object detection, the key metrics for evaluating performance include Precision (P), Recall (R), Average Precision (AP), Mean Average Precision (mAP) , F1 Score and IoU. These metrics quantify how successfully a model recognizes and localizes objects in video or image frames. In addition, Floating Point Operations (FLOPs) and Giga Floating Point Operations (GFLOPs) are utilized to measure computational complexity. Also APsmall specifically measures the model’s performance on small-scale objects, which is particularly important in UAV scenarios where objects often appear at very small sizes.
+
+## Interactive Demo
+This section presents an interactive demo of the proposed model, built using **HTML, CSS, and JavaScript** with a user-friendly interface.
+
+* The model is deployed on **Hugging Face Spaces** using **Docker** for stable, real-time inference.
+* Users can upload images and instantly view detection results with bounding boxes and confidence scores.
+
+💻 **Lamaah** is an AI-powered multi-scale object detection system optimized for complex scenes and varying object sizes.
+
+* 🔗 **Try** [Lamaah](https://madaweealabdulkreem-lamaah-demo-app.hf.space/)
 
 ## Resources 
 
